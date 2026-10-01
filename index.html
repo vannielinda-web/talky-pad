@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Talky Pad">
+<meta name="theme-color" content="#FCE8EE">
+<title>Hamilton Academy Talky Pad</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌷</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Firebase (only used once FIREBASE_CONFIG below is filled in) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+:root{
+  --blush:#FCE8EE; --petal:#F6D3DF; --rose:#E0789A; --rose-dark:#C2557B;
+  --berry:#46364A; --soft:#8E7C8C; --white:#FFFDFE; --line:#F1D3DD;
+  --serif:'Fraunces', Georgia, 'Times New Roman', serif;
+  --sans:'Nunito', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--blush);color:var(--berry);font-family:var(--sans);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--rose);outline-offset:2px}
+.wrap{max-width:640px;margin:0 auto;padding:18px 16px 120px}
+
+/* Header */
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px}
+h1{font-family:var(--serif);font-weight:700;font-size:2rem;line-height:1.05;margin:4px 0 0;letter-spacing:-.01em}
+h1 .flower{color:var(--rose);font-weight:500}
+.iconbtn{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:var(--white);display:grid;place-items:center;font-size:1.2rem;flex:none}
+.status{font-size:.82rem;color:var(--soft);margin:2px 0 14px}
+.status.warn{color:var(--rose-dark);font-weight:700}
+
+/* Year + total */
+.yearrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.yearrow button{border:none;background:none;font-size:1.4rem;color:var(--rose);padding:4px 8px}
+.yearrow .yr{font-family:var(--serif);font-size:1.25rem;font-weight:500}
+.total{font-family:var(--serif);font-weight:700;font-size:2.8rem;line-height:1;letter-spacing:-.02em}
+.total-sub{color:var(--soft);font-size:.9rem;margin-top:4px}
+
+/* Month garden (the signature piece) */
+.garden{margin:20px 0 6px;background:var(--white);border-radius:28px;padding:18px 12px 10px;border:1.5px solid var(--line)}
+.bars{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;align-items:end;height:130px}
+.bar{display:flex;flex-direction:column-reverse;justify-content:flex-start;height:100%;border:none;background:none;padding:0;border-radius:6px 6px 2px 2px;overflow:hidden;position:relative}
+.bar .stem{position:absolute;left:50%;bottom:0;width:2px;height:100%;background:var(--line);transform:translateX(-50%);z-index:0}
+.bar .seg{width:100%;position:relative;z-index:1}
+.bar .seg:first-child{border-radius:0 0 2px 2px}
+.bar .seg:last-child{border-radius:6px 6px 0 0}
+.bar .seg:only-child{border-radius:6px 6px 2px 2px}
+.bar.sel{outline:2px solid var(--berry);outline-offset:2px}
+.mlabels{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;margin-top:8px;text-align:center;font-size:.72rem;color:var(--soft);font-weight:700}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;padding:0 6px;font-size:.85rem}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+.legend b{font-weight:800}
+
+/* Controls */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:14px 0 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1.5px solid var(--line);background:var(--white);border-radius:999px;padding:8px 14px;font-weight:700;font-size:.9rem;display:inline-flex;align-items:center;gap:6px}
+.chip.on{background:var(--berry);border-color:var(--berry);color:var(--white)}
+.search{position:relative;margin:10px 0 4px}
+.search input{width:100%;border:1.5px solid var(--line);background:var(--white);border-radius:999px;padding:12px 16px 12px 42px}
+.search::before{content:"⌕";position:absolute;left:16px;top:50%;transform:translateY(-52%);font-size:1.3rem;color:var(--rose)}
+
+/* Month list */
+.month{margin-top:22px}
+.mhead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1.5px dashed var(--petal);padding-bottom:6px;margin-bottom:6px}
+.mhead h2{font-family:var(--serif);font-weight:500;font-style:italic;font-size:1.35rem;margin:0}
+.mhead .mt{font-weight:800}
+.msplit{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.8rem;color:var(--soft);margin-bottom:6px}
+.entry{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:var(--white);border:none;border-radius:18px;padding:12px 14px;margin-top:8px}
+.entry .tag{width:8px;align-self:stretch;border-radius:8px;flex:none}
+.entry .main{flex:1;min-width:0}
+.entry .what{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entry .meta{font-size:.82rem;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entry .amt{font-weight:800;white-space:nowrap}
+.empty{text-align:center;color:var(--soft);padding:40px 16px}
+.empty p{margin:6px 0}
+
+/* Bottom actions */
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--rose);color:var(--white);border:none;border-radius:999px;padding:16px 28px;font-weight:800;font-size:1.05rem;box-shadow:0 8px 24px rgba(224,120,154,.35);z-index:5}
+.fab:active{background:var(--rose-dark)}
+.linkbtn{background:none;border:none;color:var(--rose-dark);font-weight:700;text-decoration:underline;padding:8px 0}
+.foot{text-align:center;margin-top:28px}
+
+/* Sheets */
+.sheet-bg{position:fixed;inset:0;background:rgba(70,54,74,.35);display:none;align-items:flex-end;justify-content:center;z-index:10}
+.sheet-bg.open{display:flex}
+.sheet{background:var(--white);width:100%;max-width:640px;max-height:92vh;overflow-y:auto;border-radius:28px 28px 0 0;padding:22px 18px calc(24px + env(safe-area-inset-bottom,0px))}
+.sheet h3{font-family:var(--serif);font-weight:700;font-size:1.5rem;margin:0 0 14px}
+.sheet h4{font-family:var(--serif);font-weight:500;font-style:italic;font-size:1.15rem;margin:22px 0 8px}
+label{display:block;font-weight:700;font-size:.88rem;margin:12px 0 4px}
+.field{width:100%;border:1.5px solid var(--line);background:var(--blush);border-radius:14px;padding:11px 12px}
+textarea.field{min-height:70px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btns{display:flex;gap:10px;margin-top:20px}
+.btn{flex:1;border-radius:999px;padding:13px;font-weight:800;border:1.5px solid var(--line);background:var(--white)}
+.btn.pri{background:var(--rose);border-color:var(--rose);color:var(--white)}
+.btn.danger{color:#B3261E;border-color:#F0C4C0}
+.catpick{display:flex;flex-wrap:wrap;gap:8px}
+.catpick .chip{background:var(--blush)}
+.catpick .chip.on{background:var(--berry)}
+
+/* Settings editor rows */
+.edrow{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.edrow .field{flex:1;min-width:0}
+.mini{width:38px;height:38px;border-radius:12px;border:1.5px solid var(--line);background:var(--white);flex:none;font-size:.9rem}
+.mini:disabled{opacity:.3}
+.swatch{width:38px;height:38px;border-radius:50%;border:3px solid var(--white);box-shadow:0 0 0 1.5px var(--line);flex:none}
+.palette{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 12px 0}
+.palette button{width:30px;height:30px;border-radius:50%;border:2px solid var(--white);box-shadow:0 0 0 1.5px var(--line)}
+.palette button.on{box-shadow:0 0 0 3px var(--berry)}
+.addline{background:none;border:1.5px dashed var(--petal);border-radius:14px;width:100%;padding:11px;font-weight:700;color:var(--rose-dark)}
+.hint{font-size:.82rem;color:var(--soft);margin:4px 0 0}
+
+.toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--berry);color:var(--white);padding:10px 18px;border-radius:999px;font-weight:700;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (min-width:700px){.sheet-bg{align-items:center}.sheet{border-radius:28px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="title">Hamilton Academy Talky Pad</h1>
+    </div>
+    <button class="iconbtn" id="settingsBtn" aria-label="Edit app settings and categories">⚙︎</button>
+  </header>
+  <div class="status" id="status"></div>
+
+  <div class="yearrow">
+    <button id="prevYear" aria-label="Previous year">‹</button>
+    <span class="yr" id="yearLabel"></span>
+    <button id="nextYear" aria-label="Next year">›</button>
+  </div>
+  <div class="total" id="yearTotal">$0</div>
+  <div class="total-sub" id="yearSub"></div>
+
+  <div class="garden">
+    <div class="bars" id="bars"></div>
+    <div class="mlabels" id="mlabels"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="chips" id="chips"></div>
+  <div class="search"><input id="search" type="search" placeholder="Search expenses" aria-label="Search expenses"></div>
+
+  <div id="list"></div>
+
+  <div class="foot">
+    <button class="linkbtn" id="csvBtn">Download spreadsheet</button>
+  </div>
+</div>
+
+<button class="fab" id="addBtn">+ Add expense</button>
+
+<!-- Expense sheet -->
+<div class="sheet-bg" id="expBg">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="expTitle">
+    <h3 id="expTitle">Add expense</h3>
+    <label>Category</label>
+    <div class="catpick" id="fCat"></div>
+    <label for="fItem">Item</label>
+    <input class="field" id="fItem" placeholder="Fall art class, Math workbook…">
+    <div class="row2">
+      <div><label for="fAmount">Amount</label><input class="field" id="fAmount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></div>
+      <div><label for="fDate">Date</label><input class="field" id="fDate" type="date"></div>
+    </div>
+    <label for="fVendor">Vendor</label>
+    <input class="field" id="fVendor" placeholder="Co-op, Amazon, teacher's name…">
+    <label for="fKid">For</label>
+    <select class="field" id="fKid"></select>
+    <label for="fNotes">Notes</label>
+    <textarea class="field" id="fNotes"></textarea>
+    <div class="btns">
+      <button class="btn" id="expCancel">Cancel</button>
+      <button class="btn pri" id="expSave">Save expense</button>
+    </div>
+    <div class="btns" id="delWrap"><button class="btn danger" id="expDelete">Delete expense</button></div>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="sheet-bg" id="setBg">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <h3 id="setTitle">Edit my ledger</h3>
+    <label for="sTitle">App name</label>
+    <input class="field" id="sTitle">
+
+    <h4>Categories</h4>
+    <div id="sCats"></div>
+    <button class="addline" id="addCat">+ Add category</button>
+
+    <h4>Kids</h4>
+    <div id="sKids"></div>
+    <button class="addline" id="addKid">+ Add kid</button>
+    <p class="hint">"Everyone" is always there for shared costs.</p>
+
+    <div class="btns">
+      <button class="btn" id="setCancel">Cancel</button>
+      <button class="btn pri" id="setSave">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   CLOUD SETUP: paste your own Firebase config here.
+   Until then, the app saves on this device only.
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCt9v8aUhL7lQMa16p-_1nZIwul8DDGdl4",
+  authDomain: "talky-pad.firebaseapp.com",
+  projectId: "talky-pad",
+  storageBucket: "talky-pad.firebasestorage.app",
+  messagingSenderId: "311559654915",
+  appId: "1:311559654915:web:5ac94f4141f5eaadb9c836"
+};
+/* Example of what it will look like:
+const FIREBASE_CONFIG = {
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+};
+*/
+
+const PALETTE = ['#F4A6BD','#A8DCC8','#FFD89B','#A9CBEF','#CDB8F0','#FFB89A','#B8E0A0','#F7C8E0','#9ED9E0','#E4C9A8'];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DEFAULT_SETTINGS = {
+  title:'Hamilton Academy Talky Pad',
+  categories:[
+    {id:'classes', name:'Classes', color:'#F4A6BD'},
+    {id:'materials', name:'Materials', color:'#A8DCC8'}
+  ],
+  kids:['Trevor','Preston','Piper']
+};
+
+let settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+let expenses = {};
+let year = new Date().getFullYear();
+let catFilter = 'all';
+let monthFilter = null;
+let editingId = null;
+let pickedCat = null;
+let db = null;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n||0);
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const today = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1800); }
+function catById(id){ return settings.categories.find(c=>c.id===id) || {id:'none', name:'No category', color:'#C9C2B5'}; }
+
+/* ---------- Storage ---------- */
+function localLoad(){
+  try{ const s=localStorage.getItem('hsl_settings'); if(s) settings=JSON.parse(s); }catch(e){}
+  try{ const e=localStorage.getItem('hsl_expenses'); if(e) expenses=JSON.parse(e); }catch(e){}
+}
+function localSave(){
+  try{ localStorage.setItem('hsl_settings',JSON.stringify(settings)); localStorage.setItem('hsl_expenses',JSON.stringify(expenses)); }catch(e){ toast('Could not save on this device'); }
+}
+function saveExpense(x){
+  expenses[x.id]=x;
+  if(db){ db.collection('expenses').doc(x.id).set(x).catch(()=>toast('Not saved. Check your connection.')); }
+  else localSave();
+  render();
+}
+function deleteExpense(id){
+  delete expenses[id];
+  if(db){ db.collection('expenses').doc(id).delete().catch(()=>toast('Not deleted. Check your connection.')); }
+  else localSave();
+  render();
+}
+function saveSettings(){
+  if(db){ db.collection('settings').doc('main').set(settings).catch(()=>toast('Not saved. Check your connection.')); }
+  else localSave();
+  render();
+}
+
+function start(){
+  if(FIREBASE_CONFIG && window.firebase){
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      db = firebase.firestore();
+      $('status').textContent='Connecting…';
+      db.collection('settings').doc('main').onSnapshot(doc=>{
+        if(doc.exists){ settings=doc.data(); render(); }
+        else db.collection('settings').doc('main').set(settings);
+      });
+      db.collection('expenses').onSnapshot(snap=>{
+        expenses={}; snap.forEach(d=>{ expenses[d.id]=d.data(); });
+        $('status').textContent='☁︎ Cloud connected';
+        $('status').className='status';
+        render();
+      }, ()=>{ $('status').textContent='Cloud not connected. Check the Firebase setup.'; $('status').className='status warn'; });
+    }catch(e){
+      db=null; localLoad();
+      $('status').textContent='Cloud not connected. Saving on this device.'; $('status').className='status warn';
+    }
+  } else {
+    localLoad();
+    $('status').textContent='Saving on this device only (cloud not set up yet)';
+    $('status').className='status warn';
+  }
+  render();
+}
+
+/* ---------- Render ---------- */
+function yearItems(){ return Object.values(expenses).filter(x=>x.date && x.date.slice(0,4)===String(year)); }
+
+function render(){
+  document.title = settings.title || 'Hamilton Academy Talky Pad';
+  $('title').innerHTML = esc(settings.title||'Hamilton Academy Talky Pad')+'';
+  $('yearLabel').textContent = year;
+
+  const items = yearItems();
+  const total = items.reduce((t,x)=>t+(+x.amount||0),0);
+  $('yearTotal').textContent = money(total);
+  $('yearSub').textContent = items.length ? items.length+' expense'+(items.length===1?'':'s')+' this year' : 'Nothing logged for '+year+' yet';
+
+  // Month bars
+  const cats = settings.categories.concat([{id:'none',name:'No category',color:'#C9C2B5'}]);
+  const byMonth = MONTHS.map(()=>({}));
+  items.forEach(x=>{
+    const m = +x.date.slice(5,7)-1;
+    const cid = settings.categories.some(c=>c.id===x.cat) ? x.cat : 'none';
+    byMonth[m][cid] = (byMonth[m][cid]||0) + (+x.amount||0);
+  });
+  const mTotals = byMonth.map(o=>Object.values(o).reduce((a,b)=>a+b,0));
+  const max = Math.max(...mTotals, 1);
+  $('bars').innerHTML = byMonth.map((o,i)=>{
+    const segs = cats.filter(c=>o[c.id]).map(c=>`<span class="seg" style="height:${(o[c.id]/max*100).toFixed(2)}%;background:${c.color}"></span>`).join('');
+    return `<button class="bar${monthFilter===i?' sel':''}" data-m="${i}" aria-label="${MONTHS[i]}: ${money(mTotals[i])}"><span class="stem"></span>${segs}</button>`;
+  }).join('');
+  $('mlabels').innerHTML = MONTHS.map(m=>`<span>${m[0]}</span>`).join('');
+  document.querySelectorAll('.bar').forEach(b=>b.onclick=()=>{
+    const m=+b.dataset.m; monthFilter = monthFilter===m ? null : m; render();
+    const el=document.getElementById('m'+m); if(el && monthFilter!==null) el.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+
+  // Legend with year totals per category
+  const catTotals = {};
+  items.forEach(x=>{ const cid=settings.categories.some(c=>c.id===x.cat)?x.cat:'none'; catTotals[cid]=(catTotals[cid]||0)+(+x.amount||0); });
+  $('legend').innerHTML = cats.filter(c=>c.id!=='none'||catTotals.none).map(c=>`<span><i class="dot" style="background:${c.color}"></i>${esc(c.name)} <b>${money(catTotals[c.id])}</b></span>`).join('');
+
+  // Chips
+  $('chips').innerHTML = `<button class="chip${catFilter==='all'?' on':''}" data-c="all">All</button>` +
+    settings.categories.map(c=>`<button class="chip${catFilter===c.id?' on':''}" data-c="${esc(c.id)}"><i class="dot" style="background:${c.color}"></i>${esc(c.name)}</button>`).join('') +
+    (monthFilter!==null ? `<button class="chip" data-clear="1">${MONTHS[monthFilter]} ✕</button>` : '');
+  document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{
+    if(b.dataset.clear){ monthFilter=null; } else catFilter=b.dataset.c;
+    render();
+  });
+
+  // List
+  const q = $('search').value.trim().toLowerCase();
+  let list = items.filter(x=>{
+    if(catFilter!=='all' && x.cat!==catFilter) return false;
+    if(monthFilter!==null && +x.date.slice(5,7)-1!==monthFilter) return false;
+    if(q){ const hay=[x.item,x.vendor,x.kid,x.notes,catById(x.cat).name].join(' ').toLowerCase(); if(!hay.includes(q)) return false; }
+    return true;
+  }).sort((a,b)=> b.date.localeCompare(a.date) || (b.created||0)-(a.created||0));
+
+  if(!list.length){
+    $('list').innerHTML = items.length
+      ? `<div class="empty"><p>No expenses match.</p><p>Try another category or clear the search.</p></div>`
+      : `<div class="empty"><p>Your ${year} ledger is empty.</p><p>Tap <b>+ Add expense</b> to log your first class or material.</p></div>`;
+    return;
+  }
+  const groups = {};
+  list.forEach(x=>{ const m=+x.date.slice(5,7)-1; (groups[m]=groups[m]||[]).push(x); });
+  $('list').innerHTML = Object.keys(groups).map(Number).sort((a,b)=>b-a).map(m=>{
+    const g = groups[m];
+    const mt = g.reduce((t,x)=>t+(+x.amount||0),0);
+    const split = {};
+    g.forEach(x=>{ const c=catById(x.cat); split[c.name]=(split[c.name]||0)+(+x.amount||0); });
+    const splitHtml = Object.keys(split).length>1 ? `<div class="msplit">${Object.entries(split).map(([n,v])=>`<span>${esc(n)} ${money(v)}</span>`).join('')}</div>` : '';
+    return `<section class="month" id="m${m}">
+      <div class="mhead"><h2>${MONTHS[m]}</h2><span class="mt">${money(mt)}</span></div>
+      ${splitHtml}
+      ${g.map(x=>{
+        const c=catById(x.cat);
+        const d=new Date(x.date+'T12:00:00');
+        const meta=[d.toLocaleDateString('en-US',{month:'short',day:'numeric'}), x.vendor, x.kid].filter(Boolean).map(esc).join(', ');
+        return `<button class="entry" data-id="${esc(x.id)}"><span class="tag" style="background:${c.color}"></span>
+          <span class="main"><div class="what">${esc(x.item||c.name)}</div><div class="meta">${meta}</div></span>
+          <span class="amt">${money(x.amount)}</span></button>`;
+      }).join('')}
+    </section>`;
+  }).join('');
+  document.querySelectorAll('.entry').forEach(b=>b.onclick=()=>openExpense(b.dataset.id));
+}
+
+/* ---------- Expense sheet ---------- */
+function renderCatPick(){
+  $('fCat').innerHTML = settings.categories.map(c=>`<button type="button" class="chip${pickedCat===c.id?' on':''}" data-c="${esc(c.id)}"><i class="dot" style="background:${c.color}"></i>${esc(c.name)}</button>`).join('');
+  document.querySelectorAll('#fCat .chip').forEach(b=>b.onclick=()=>{ pickedCat=b.dataset.c; renderCatPick(); });
+}
+function openExpense(id){
+  editingId = id || null;
+  const x = id ? expenses[id] : null;
+  $('expTitle').textContent = x ? 'Edit expense' : 'Add expense';
+  pickedCat = x ? x.cat : (catFilter!=='all' ? catFilter : (settings.categories[0]||{}).id);
+  renderCatPick();
+  $('fItem').value = x ? x.item||'' : '';
+  $('fAmount').value = x ? x.amount : '';
+  $('fDate').value = x ? x.date : today();
+  $('fVendor').value = x ? x.vendor||'' : '';
+  $('fKid').innerHTML = ['Everyone'].concat(settings.kids).map(k=>`<option>${esc(k)}</option>`).join('');
+  if(x && x.kid && !['Everyone'].concat(settings.kids).includes(x.kid)) $('fKid').insertAdjacentHTML('beforeend',`<option>${esc(x.kid)}</option>`);
+  $('fKid').value = x ? (x.kid||'Everyone') : 'Everyone';
+  $('fNotes').value = x ? x.notes||'' : '';
+  $('delWrap').style.display = x ? 'flex' : 'none';
+  $('expBg').classList.add('open');
+}
+$('addBtn').onclick = ()=>openExpense();
+$('expCancel').onclick = ()=>$('expBg').classList.remove('open');
+$('expSave').onclick = ()=>{
+  const amount = parseFloat($('fAmount').value);
+  if(!pickedCat){ toast('Pick a category'); return; }
+  if(isNaN(amount)){ toast('Add an amount'); $('fAmount').focus(); return; }
+  if(!$('fDate').value){ toast('Add a date'); return; }
+  const old = editingId ? expenses[editingId] : null;
+  const x = {
+    id: editingId || uid(),
+    cat: pickedCat,
+    item: $('fItem').value.trim(),
+    amount: Math.round(amount*100)/100,
+    date: $('fDate').value,
+    vendor: $('fVendor').value.trim(),
+    kid: $('fKid').value,
+    notes: $('fNotes').value.trim(),
+    created: old ? (old.created||Date.now()) : Date.now()
+  };
+  year = +x.date.slice(0,4);
+  saveExpense(x);
+  $('expBg').classList.remove('open');
+  toast(old ? 'Expense saved' : 'Expense added');
+};
+$('expDelete').onclick = ()=>{
+  if(!editingId) return;
+  if(confirm('Delete this expense? This cannot be undone.')){
+    deleteExpense(editingId);
+    $('expBg').classList.remove('open');
+    toast('Expense deleted');
+  }
+};
+
+/* ---------- Settings sheet ---------- */
+let draft = null;
+let openPalette = null;
+function renderSettings(){
+  $('sCats').innerHTML = draft.categories.map((c,i)=>`
+    <div class="edrow">
+      <button type="button" class="swatch" style="background:${c.color}" data-pal="${i}" aria-label="Change color for ${esc(c.name)}"></button>
+      <input class="field" data-cname="${i}" value="${esc(c.name)}" aria-label="Category name">
+      <button type="button" class="mini" data-up="${i}" ${i===0?'disabled':''} aria-label="Move up">▲</button>
+      <button type="button" class="mini" data-down="${i}" ${i===draft.categories.length-1?'disabled':''} aria-label="Move down">▼</button>
+      <button type="button" class="mini" data-cdel="${i}" aria-label="Delete category">✕</button>
+    </div>
+    ${openPalette===i ? `<div class="palette">${PALETTE.map(p=>`<button type="button" style="background:${p}" class="${p===c.color?'on':''}" data-setcol="${i}" data-col="${p}" aria-label="Color ${p}"></button>`).join('')}</div>` : ''}
+  `).join('');
+  $('sKids').innerHTML = draft.kids.map((k,i)=>`
+    <div class="edrow">
+      <input class="field" data-kname="${i}" value="${esc(k)}" aria-label="Kid name">
+      <button type="button" class="mini" data-kdel="${i}" aria-label="Remove">✕</button>
+    </div>`).join('');
+
+  document.querySelectorAll('[data-cname]').forEach(el=>el.oninput=()=>{ draft.categories[+el.dataset.cname].name=el.value; });
+  document.querySelectorAll('[data-kname]').forEach(el=>el.oninput=()=>{ draft.kids[+el.dataset.kname]=el.value; });
+  document.querySelectorAll('[data-pal]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.pal; openPalette = openPalette===i?null:i; renderSettings(); });
+  document.querySelectorAll('[data-setcol]').forEach(b=>b.onclick=()=>{ draft.categories[+b.dataset.setcol].color=b.dataset.col; openPalette=null; renderSettings(); });
+  document.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.up; const a=draft.categories; [a[i-1],a[i]]=[a[i],a[i-1]]; openPalette=null; renderSettings(); });
+  document.querySelectorAll('[data-down]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.down; const a=draft.categories; [a[i+1],a[i]]=[a[i],a[i+1]]; openPalette=null; renderSettings(); });
+  document.querySelectorAll('[data-cdel]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.cdel; const c=draft.categories[i];
+    const used=Object.values(expenses).filter(x=>x.cat===c.id).length;
+    const msg = used ? `Delete "${c.name}"? ${used} expense${used===1?'':'s'} will show as "No category" until you edit them.` : `Delete "${c.name}"?`;
+    if(confirm(msg)){ draft.categories.splice(i,1); openPalette=null; renderSettings(); }
+  });
+  document.querySelectorAll('[data-kdel]').forEach(b=>b.onclick=()=>{ draft.kids.splice(+b.dataset.kdel,1); renderSettings(); });
+}
+$('settingsBtn').onclick = ()=>{
+  draft = JSON.parse(JSON.stringify(settings));
+  openPalette = null;
+  $('sTitle').value = draft.title||'';
+  renderSettings();
+  $('setBg').classList.add('open');
+};
+$('addCat').onclick = ()=>{
+  const used = draft.categories.map(c=>c.color);
+  const color = PALETTE.find(p=>!used.includes(p)) || PALETTE[draft.categories.length%PALETTE.length];
+  draft.categories.push({id:uid(), name:'', color});
+  renderSettings();
+  const inputs=document.querySelectorAll('[data-cname]'); inputs[inputs.length-1].focus();
+};
+$('addKid').onclick = ()=>{
+  draft.kids.push('');
+  renderSettings();
+  const inputs=document.querySelectorAll('[data-kname]'); inputs[inputs.length-1].focus();
+};
+$('setCancel').onclick = ()=>$('setBg').classList.remove('open');
+$('setSave').onclick = ()=>{
+  draft.title = $('sTitle').value.trim() || 'Hamilton Academy Talky Pad';
+  draft.categories = draft.categories.map(c=>({...c, name:c.name.trim()})).filter(c=>c.name);
+  draft.kids = draft.kids.map(k=>k.trim()).filter(Boolean);
+  settings = draft;
+  if(catFilter!=='all' && !settings.categories.some(c=>c.id===catFilter)) catFilter='all';
+  saveSettings();
+  $('setBg').classList.remove('open');
+  toast('Changes saved');
+};
+
+/* ---------- Other controls ---------- */
+$('prevYear').onclick = ()=>{ year--; monthFilter=null; render(); };
+$('nextYear').onclick = ()=>{ year++; monthFilter=null; render(); };
+$('search').oninput = render;
+[$('expBg'),$('setBg')].forEach(bg=>bg.addEventListener('click',e=>{ if(e.target===bg) bg.classList.remove('open'); }));
+
+$('csvBtn').onclick = ()=>{
+  const rows=[['Date','Month','Category','Item','Vendor','For','Amount','Notes']];
+  Object.values(expenses).sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=>{
+    rows.push([x.date, MONTHS[+x.date.slice(5,7)-1]+' '+x.date.slice(0,4), catById(x.cat).name, x.item||'', x.vendor||'', x.kid||'', (+x.amount||0).toFixed(2), x.notes||'']);
+  });
+  const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'homeschool-expenses.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('Spreadsheet downloaded');
+};
+
+start();
+</script>
+</body>
+</html>
